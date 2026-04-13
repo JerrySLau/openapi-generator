@@ -386,10 +386,13 @@ public class PhpSymfonyServerCodegen extends AbstractPhpCodegen implements Codeg
         List<CodegenOperation> operationList = operations.getOperation();
 
         for (CodegenOperation op : operationList) {
-            // Per-parameter: enum $ref fixes (normalizeEnumRefParameterDataType → syncEnumRefOperationImports),
-            // then x-parameter-type / x-comment-type. Aggregated Api imports are rebuilt once afterward
-            // (refreshAggregatedImportsForOperations).
+            // Loop through all input parameters to determine, whether we have to import something to
+            // make the input type available.
             for (CodegenParameter param : op.allParams) {
+                // Enum-by-reference query params (e.g. OAS 3.1 dotted keys): normalize dataType and
+                // sync this operation's imports (normalizeEnumRefParameterDataType →
+                // syncEnumRefOperationImports). refreshAggregatedImportsForOperations runs once after
+                // this inner loop to rebuild bundle-level Api imports for Mustache.
                 normalizeEnumRefParameterDataType(op, param);
                 // Determine if the parameter type is supported as a type hint and make it available
                 // to the templating engine
