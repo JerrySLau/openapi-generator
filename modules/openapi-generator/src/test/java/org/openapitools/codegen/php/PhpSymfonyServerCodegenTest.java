@@ -216,14 +216,20 @@ public class PhpSymfonyServerCodegenTest {
         Assert.assertTrue(
                 apiContent.contains("use Org\\OpenAPITools\\Petstore\\Model\\PetModelPetStatus;"),
                 "Expected enum model import");
-        // Optional enum ref may carry an OpenAPI default: php-symfony api.mustache omits leading "?" / "|null" when
-        // defaultValue is set (handler always receives the enum after the controller applies the default).
+        // This spec sets default: available on the enum $ref; the handler must be non-nullable (no leading "?" /
+        // "|null") because the controller always supplies a value after applying the OpenAPI default.
         Assert.assertTrue(
-                Pattern.compile("public function listPets\\(\\s*\\??PetModelPetStatus\\s+\\$status,").matcher(apiContent).find(),
-                "Expected enum ref query param to use short class in type hint");
+                Pattern.compile("public function listPets\\(\\s*PetModelPetStatus\\s+\\$status,").matcher(apiContent).find(),
+                "Expected defaulted enum-ref query param to use short non-nullable class in type hint");
+        Assert.assertFalse(
+                Pattern.compile("public function listPets\\(\\s*\\?PetModelPetStatus\\s+\\$status").matcher(apiContent).find(),
+                "Defaulted enum-ref query param must not use nullable type hint (?PetModelPetStatus)");
         Assert.assertTrue(
-                Pattern.compile("@param\\s+PetModelPetStatus(\\|null)?\\s+\\$status\\b").matcher(apiContent).find(),
-                "PHPDoc @param should use short PetModelPetStatus (optional |null when no default in spec)");
+                Pattern.compile("@param\\s+PetModelPetStatus\\s+\\$status\\b").matcher(apiContent).find(),
+                "PHPDoc @param should use short PetModelPetStatus without |null when OpenAPI default is set");
+        Assert.assertFalse(
+                Pattern.compile("@param\\s+PetModelPetStatus\\|null\\s+\\$status\\b").matcher(apiContent).find(),
+                "PHPDoc must not document |null for enum ref when OpenAPI default is set");
         Assert.assertFalse(
                 apiContent.contains("?\\Org\\OpenAPITools\\Petstore\\Model\\PetModelPetStatus $status"),
                 "Signature must not use leading-backslash FQCN when a matching use import exists");
@@ -274,6 +280,25 @@ public class PhpSymfonyServerCodegenTest {
         final ClientOptInput clientOptInput = configurator.toClientOptInput();
         DefaultGenerator generator = new DefaultGenerator();
         List<File> files = generator.opts(clientOptInput).generate();
+
+        File apiInterfaceFile = files.stream()
+                .filter(f -> "DefaultApiInterface.php".equals(f.getName()) && f.getPath().contains("Api" + File.separator))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("DefaultApiInterface.php not generated"));
+        String apiContent = Files.readString(apiInterfaceFile.toPath(), StandardCharsets.UTF_8);
+        Assert.assertTrue(
+                Pattern.compile("public function listFeedHints\\(\\s*PetAnnouncementTone\\s+\\$tone,").matcher(apiContent).find(),
+                "Expected defaulted enum-ref query param to use short non-nullable class in API interface type hint");
+        Assert.assertFalse(
+                Pattern.compile("public function listFeedHints\\(\\s*\\?PetAnnouncementTone\\s+\\$tone").matcher(apiContent).find(),
+                "Defaulted enum-ref query param must not use nullable type hint (?PetAnnouncementTone)");
+        Assert.assertTrue(
+                Pattern.compile("@param\\s+PetAnnouncementTone\\s+\\$tone\\b").matcher(apiContent).find(),
+                "PHPDoc @param should use PetAnnouncementTone without |null when OpenAPI default is set");
+        Assert.assertFalse(
+                Pattern.compile("@param\\s+PetAnnouncementTone\\|null\\s+\\$tone\\b").matcher(apiContent).find(),
+                "PHPDoc must not document |null for enum ref when OpenAPI default is set");
+        assertGeneratedPhpSyntaxValid(apiInterfaceFile);
 
         File controllerFile = files.stream()
                 .filter(f -> "DefaultController.php".equals(f.getName()) && f.getPath().contains("Controller" + File.separator))
