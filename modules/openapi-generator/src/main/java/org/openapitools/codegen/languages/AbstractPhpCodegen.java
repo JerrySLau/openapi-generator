@@ -636,6 +636,17 @@ public abstract class AbstractPhpCodegen extends DefaultCodegen implements Codeg
             }
         }
 
+        // OAS 3.x: `default` may appear alongside `$ref` on the same schema (e.g. optional query param whose schema
+        // references an enum model). That wrapper is often not classified as string/number here, but still carries
+        // the default OpenAPI value — needed so Mustache can emit `query->get(..., <default>)` for php-symfony.
+        if (p.getDefault() != null) {
+            Object def = p.getDefault();
+            if (def instanceof String) {
+                return "'" + escapeTextInSingleQuotes((String) def) + "'";
+            }
+            return def.toString();
+        }
+
         return null;
     }
 
