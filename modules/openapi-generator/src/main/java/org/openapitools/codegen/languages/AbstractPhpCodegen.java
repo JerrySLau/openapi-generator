@@ -781,9 +781,25 @@ public abstract class AbstractPhpCodegen extends DefaultCodegen implements Codeg
         }
     }
 
+    /**
+     * Builds the PHP expression for a backed enum case default (PHP 8.1+ {@code enum}).
+     * <p>
+     * The legacy {@code self::}{@code <datatype>_<CASE>} form came from class-constant style enums (#10273) and is
+     * invalid when {@code datatype} is a namespaced class: {@code self::} only resolves constants on the current
+     * class. Native enums must use {@code EnumType::CASE}.
+     * <p>
+     * Execution: {@code datatype} is produced upstream (e.g. {@link DefaultCodegen#updateCodegenPropertyEnum}) via
+     * {@link #getTypeDeclaration(Schema)} for the referenced enum schema; {@code value} is the sanitized case name
+     * from {@link #toEnumVarName}. We concatenate with {@code ::} so templates emit valid PHP (e.g.
+     * {@code \Vendor\Model\Status::AVAILABLE}).
+     *
+     * @param value    enum case name (e.g. {@code AVAILABLE})
+     * @param datatype enum class as in generated PHP (often leading {@code \} + FQCN)
+     * @return PHP default expression for that case
+     */
     @Override
     public String toEnumDefaultValue(String value, String datatype) {
-        return "self::" + datatype + "_" + value;
+        return datatype + "::" + value;
     }
 
     @Override
