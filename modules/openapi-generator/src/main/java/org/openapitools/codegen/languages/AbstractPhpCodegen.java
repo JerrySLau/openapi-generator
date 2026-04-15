@@ -790,16 +790,37 @@ public abstract class AbstractPhpCodegen extends DefaultCodegen implements Codeg
      * <p>
      * Execution: {@code datatype} is produced upstream (e.g. {@link DefaultCodegen#updateCodegenPropertyEnum}) via
      * {@link #getTypeDeclaration(Schema)} for the referenced enum schema; {@code value} is the sanitized case name
-     * from {@link #toEnumVarName}. We concatenate with {@code ::} so templates emit valid PHP (e.g.
-     * {@code \Vendor\Model\Status::AVAILABLE}).
+     * from {@link #toEnumVarName}. When the enum class sits under {@link #modelPackage}, we emit only the short class
+     * name plus {@code ::} so it matches sibling model references in generated files ({@code namespace} is
+     * {@code modelPackage}; unqualified names resolve correctly). A fully qualified body without a leading
+     * {@code \} would be resolved relative to the file namespace and is invalid PHP for defaults.
      *
      * @param value    enum case name (e.g. {@code AVAILABLE})
-     * @param datatype enum class as in generated PHP (often leading {@code \} + FQCN)
-     * @return PHP default expression for that case
+     * @param datatype enum class as produced by {@link #getTypeDeclaration(Schema)} (may include {@code modelPackage})
+     * @return PHP default expression for that case (e.g. {@code PetStatus::AVAILABLE})
      */
     @Override
     public String toEnumDefaultValue(String value, String datatype) {
-        return datatype + "::" + value;
+        return unqualifiedEnumClassForModelDefault(datatype) + "::" + value;
+    }
+
+    /**
+     * Strips {@link #modelPackage} from a declared enum class name so defaults use the same unqualified form as
+     * property type hints in model templates.
+     *
+     * @param datatype enum class string from codegen (optional leading {@code \})
+     * @return short class name if under {@code modelPackage}, otherwise the original {@code datatype}
+     */
+    private String unqualifiedEnumClassForModelDefault(String datatype) {
+        if (StringUtils.isBlank(datatype) || StringUtils.isBlank(modelPackage)) {
+            return datatype;
+        }
+        String normalized = datatype.charAt(0) == '\\' ? datatype.substring(1) : datatype;
+        String prefix = modelPackage + "\\";
+        if (normalized.startsWith(prefix)) {
+            return normalized.substring(prefix.length());
+        }
+        return datatype;
     }
 
     @Override
